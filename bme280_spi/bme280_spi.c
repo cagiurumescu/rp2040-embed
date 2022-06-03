@@ -15,6 +15,8 @@
 #include "pico/stdlib.h"
 #include "pico/binary_info.h"
 #include "hardware/spi.h"
+#include "hardware/gpio.h"
+#include "hardware/irq.h"
 
 /* Example code to talk to a bme280 humidity/temperature/pressure sensor.
 
@@ -190,12 +192,21 @@ static void bme280_read_raw(int32_t *humidity, int32_t *pressure, int32_t *tempe
 }
 #endif
 
+uint8_t do_read = 0;
+void gpio_callback(uint gpio, uint32_t events) {
+   if (gpio==8) {
+      do_read = 1;
+   }
+}
+
 int main() {
     stdio_init_all();
 #if !defined(spi_default) || !defined(PICO_DEFAULT_SPI_SCK_PIN) || !defined(PICO_DEFAULT_SPI_TX_PIN) || !defined(PICO_DEFAULT_SPI_RX_PIN) || !defined(PICO_DEFAULT_SPI_CSN_PIN)
 #warning spi/bme280_spi example requires a board with SPI pins
     puts("Default SPI pins were not defined");
 #else
+
+    gpio_set_irq_enabled_with_callback(8, GPIO_IRQ_EDGE_RISE, true, &gpio_callback);
 
     int baud;
     // This example will use SPI0 at 0.5MHz.
@@ -228,6 +239,7 @@ int main() {
     int32_t humidity, pressure, temperature;
 
     while (1) {
+       if (do_read) {
         bme280_read_raw(&humidity, &pressure, &temperature);
 
         // These are the raw numbers from the chip, so we need to run through the
@@ -239,6 +251,8 @@ int main() {
         printf("Humidity = %.2f%%\n", humidity / 1024.0);
         printf("Pressure = %dPa\n", pressure);
         printf("Temp. = %.2fC\n", temperature / 100.0);
+        do_read = 0;
+       }
 
         sleep_ms(1000);
     }

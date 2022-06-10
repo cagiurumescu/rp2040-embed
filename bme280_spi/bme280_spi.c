@@ -193,8 +193,11 @@ static void bme280_read_raw(int32_t *humidity, int32_t *pressure, int32_t *tempe
 #endif
 
 uint8_t do_read = 0;
+#define GPIO_SPI_INT 8
 void gpio_callback(uint gpio, uint32_t events) {
-   if (gpio==8) {
+   if (gpio==GPIO_SPI_INT) {
+      gpio_set_irq_enabled(GPIO_SPI_INT, events, false);
+      gpio_acknowledge_irq(GPIO_SPI_INT, events);
       do_read = 1;
    }
 }
@@ -206,12 +209,12 @@ int main() {
     puts("Default SPI pins were not defined");
 #else
 
-    gpio_set_irq_enabled_with_callback(8, GPIO_IRQ_EDGE_RISE, true, &gpio_callback);
+    gpio_set_irq_enabled_with_callback(GPIO_SPI_INT, GPIO_IRQ_EDGE_RISE, true, &gpio_callback);
 
     int baud;
     // This example will use SPI0 at 0.5MHz.
     // max seems to be 12.5 MHz
-    baud=spi_init(spi_default, 11*1000 * 1000);
+    baud=spi_init(spi_default, 11 * 1000 * 1000);
     printf("Hello, bme280! Reading raw data from registers via SPI @ %d Hz...\n", baud);
     gpio_set_function(PICO_DEFAULT_SPI_RX_PIN, GPIO_FUNC_SPI);
     gpio_set_function(PICO_DEFAULT_SPI_SCK_PIN, GPIO_FUNC_SPI);
@@ -252,9 +255,10 @@ int main() {
         printf("Pressure = %dPa\n", pressure);
         printf("Temp. = %.2fC\n", temperature / 100.0);
         do_read = 0;
+        gpio_set_irq_enabled(GPIO_SPI_INT, GPIO_IRQ_EDGE_RISE, true);
        }
 
-        sleep_ms(1000);
+        sleep_ms(10);
     }
 
     return 0;
